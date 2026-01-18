@@ -6,254 +6,149 @@ from datetime import datetime
 from urllib.parse import quote
 
 # -----------------------------
-# PAGE CONFIG
+# PREMIUM UI & BRANDING CLEANUP
 # -----------------------------
 st.set_page_config(
-    page_title="Shikhar Traders Premium",
+    page_title="Shikhar Traders AI",
     page_icon="🎙️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed" # Hide sidebar by default for a clean look
 )
 
-# -----------------------------
-# PREMIUM UI CSS
-# -----------------------------
+# Custom CSS to hide Streamlit header, footer, and menu
 st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
-    
-    html, body, [class*="st-"] {
-        font-family: 'Inter', sans-serif;
-    }
+    <style>
+        /* Hide Streamlit Branding */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        
+        /* Premium Background & Glassmorphism */
+        .stApp {
+            background: radial-gradient(circle at 10% 10%, rgba(0, 245, 255, 0.05), transparent 30%),
+                        linear-gradient(135deg, #05060b 0%, #0a0b1e 100%);
+            color: #ffffff;
+        }
+        
+        /* Clean Chat Bubbles */
+        .user-bubble {
+            background: rgba(0, 245, 255, 0.1);
+            border: 1px solid rgba(0, 245, 255, 0.2);
+            padding: 1rem;
+            border-radius: 15px 15px 0 15px;
+            margin: 10px 0;
+            margin-left: 20%;
+            text-align: right;
+        }
+        
+        .agent-bubble {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            border-radius: 15px 15px 15px 0;
+            margin: 10px 0;
+            margin-right: 20%;
+        }
 
-    .stApp {
-        background: radial-gradient(circle at 20% 20%, rgba(0, 245, 255, 0.05), transparent 40%),
-                    radial-gradient(circle at 80% 80%, rgba(168, 85, 247, 0.08), transparent 40%),
-                    #0a0b10;
-        color: #e0e0e0;
-    }
-
-    .glow-title {
-        font-size: 3rem;
-        font-weight: 800;
-        background: linear-gradient(90deg, #00f5ff, #a855f7, #00ff88);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0.5rem;
-    }
-
-    .glass-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 20px;
-        padding: 25px;
-        backdrop-filter: blur(12px);
-        margin-bottom: 20px;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-    }
-
-    .stButton>button {
-        width: 100%;
-        border-radius: 12px !important;
-        background: linear-gradient(135deg, rgba(0, 245, 255, 0.1), rgba(168, 85, 247, 0.1)) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        color: white !important;
-        transition: all 0.3s ease !important;
-        font-weight: 600 !important;
-    }
-
-    .stButton>button:hover {
-        border: 1px solid #00f5ff !important;
-        background: rgba(0, 245, 255, 0.15) !important;
-        transform: translateY(-2px);
-    }
-
-    .chat-bubble-user {
-        background: rgba(168, 85, 247, 0.1);
-        border: 1px solid rgba(168, 85, 247, 0.2);
-        padding: 15px;
-        border-radius: 15px 15px 0 15px;
-        margin: 10px 0;
-        text-align: right;
-    }
-
-    .chat-bubble-agent {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 15px;
-        border-radius: 15px 15px 15px 0;
-        margin: 10px 0;
-    }
-
-    .status-badge {
-        padding: 4px 12px;
-        border-radius: 50px;
-        font-size: 0.8rem;
-        background: rgba(0, 255, 136, 0.1);
-        color: #00ff88;
-        border: 1px solid rgba(0, 255, 136, 0.2);
-    }
-</style>
+        .premium-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .glow-text {
+            font-weight: 800;
+            background: linear-gradient(90deg, #00f5ff, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------
-# BUSINESS LOGIC
+# CONFIGURATION
 # -----------------------------
-BUSINESS = {
-    "name": "Shikhar Traders",
-    "phones": ["+917355969446", "+919450805567"],
-    "email": "shikhartraders@zohomail.com",
-    "website": "https://shikhartradersbs.odoo.com/",
-    "kb": """You are the official Shikhar Traders AI. We only sell UltraTech products.
-    Prices (Approx): 
-    - Paper Bag: ₹405
-    - Super: ₹415
-    - Weather Plus: ₹420
-    - Weather Pro (Waterproofing): 1L: ₹175, 5L: ₹750, 10L: ₹1450, 20L: ₹2500
-    - Iron Ring: ₹12 (Bulk 120+ only).
-    Note: Always tell users that stock and final price must be confirmed via WhatsApp/Call."""
-}
+# Directly set your configurations here for the integrated app
+OPENAI_API_KEY = "your-api-key-here" # Replace with your key
+CONTACT_NUMBER = "+917355969446"
 
 # -----------------------------
-# HELPER FUNCTIONS
+# CORE AI LOGIC
 # -----------------------------
-def get_ai_response(api_key, messages, lang):
-    headers = {"Authorization": f"Bearer {api_key}"}
-    system_msg = f"Act as a helpful sales agent for Shikhar Traders. Answer in {lang}. Be concise."
+def get_ai_response(messages):
+    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
+    system_prompt = "You are the Shikhar Traders AI Sales Agent. Be professional and helpful. Focus on UltraTech products."
     
-    combined_messages = [{"role": "system", "content": system_msg + BUSINESS['kb']}] + messages
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [{"role": "system", "content": system_prompt}] + messages,
+        "temperature": 0.7
+    }
     
     try:
-        response = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers=headers,
-            json={
-                "model": "gpt-4o-mini",
-                "messages": combined_messages,
-                "temperature": 0.7
-            },
-            timeout=15
-        )
+        response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
         return response.json()['choices'][0]['message']['content']
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-def text_to_speech(api_key, text, voice_style):
-    headers = {"Authorization": f"Bearer {api_key}"}
-    try:
-        response = requests.post(
-            "https://api.openai.com/v1/audio/speech",
-            headers=headers,
-            json={"model": "tts-1", "voice": voice_style, "input": text},
-            timeout=20
-        )
-        return response.content
     except:
-        return None
+        return "I'm having trouble connecting. Please call Shikhar Traders directly at 07355969446."
 
 # -----------------------------
-# SIDEBAR
-# -----------------------------
-with st.sidebar:
-    st.title("⚙️ Settings")
-    api_key = st.text_input("OpenAI API Key", type="password")
-    lang = st.selectbox("Language", ["English", "Hindi", "Hinglish"])
-    voice_opt = st.selectbox("Voice Tone", ["alloy", "shimmer", "nova", "echo"])
-    enable_voice = st.toggle("Enable Voice Output", value=True)
-    
-    st.divider()
-    admin_pin = st.text_input("Admin Access", type="password")
-
-# -----------------------------
-# MAIN UI
+# MAIN APP INTERFACE
 # -----------------------------
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.markdown(f"<div class='glow-title'>{BUSINESS['name']}</div>", unsafe_allow_html=True)
-    st.markdown("<span class='status-badge'>● AI Agent Online</span>", unsafe_allow_html=True)
+    st.markdown("<h1 class='glow-text'>Shikhar Traders AI</h1>", unsafe_allow_html=True)
+    st.caption("Official UltraTech Sales Assistant • Online")
 
 with col2:
     st.markdown(f"""
-    <div class='glass-card' style='padding: 15px;'>
-        <b>📞 Support:</b> {BUSINESS['phones'][0]}<br>
-        <b>🌐 Web:</b> <a href='{BUSINESS['website']}' style='color:#00f5ff;'>Visit Site</a>
+    <div class='premium-card'>
+        📞 <b>Support:</b> {CONTACT_NUMBER}<br>
+        📍 <b>Location:</b> Deoria, UP
     </div>
     """, unsafe_allow_html=True)
 
-# -----------------------------
-# QUICK ACTIONS
-# -----------------------------
-st.markdown("### ⚡ Quick Queries")
-q_cols = st.columns(4)
-queries = ["Today's Cement Prices", "Waterproofing Range", "Bulk Iron Rings", "Delivery Terms"]
+# Chat Session History
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-for i, q in enumerate(queries):
-    if q_cols[i % 4].button(q):
-        st.session_state.pending_query = q
+# Container for chat display
+chat_display = st.container()
 
-# -----------------------------
-# CHAT INTERFACE
-# -----------------------------
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+with chat_display:
+    for message in st.session_state.chat_history:
+        div_class = "user-bubble" if message["role"] == "user" else "agent-bubble"
+        st.markdown(f"<div class='{div_class}'>{message['content']}</div>", unsafe_allow_html=True)
 
-chat_container = st.container()
+# User Input
+user_query = st.chat_input("Ask about UltraTech cement or book an order...")
 
-with chat_container:
-    for m in st.session_state.messages:
-        role_class = "chat-bubble-user" if m["role"] == "user" else "chat-bubble-agent"
-        st.markdown(f"<div class='{role_class}'>{m['content']}</div>", unsafe_allow_html=True)
-
-# -----------------------------
-# INPUT & PROCESSING
-# -----------------------------
-user_input = st.chat_input("Ask about UltraTech products...")
-if "pending_query" in st.session_state:
-    user_input = st.session_state.pop("pending_query")
-
-if user_input:
-    if not api_key:
-        st.error("Please enter your OpenAI API Key in the sidebar.")
-    else:
-        # Display User Message
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        with chat_container:
-            st.markdown(f"<div class='chat-bubble-user'>{user_input}</div>", unsafe_allow_html=True)
-
-        # Get AI Response
-        with st.spinner("Consulting Shikhar Traders..."):
-            ai_reply = get_ai_response(api_key, st.session_state.messages, lang)
-            st.session_state.messages.append({"role": "assistant", "content": ai_reply})
-            
-            with chat_container:
-                st.markdown(f"<div class='chat-bubble-agent'>{ai_reply}</div>", unsafe_allow_html=True)
-                
-                if enable_voice:
-                    audio_data = text_to_speech(api_key, ai_reply, voice_opt)
-                    if audio_data:
-                        st.audio(audio_data, format="audio/mp3", autoplay=True)
+if user_query:
+    # Add user message
+    st.session_state.chat_history.append({"role": "user", "content": user_query})
+    
+    # Get AI response
+    with st.spinner("Processing..."):
+        ai_reply = get_ai_response(st.session_state.chat_history)
+        st.session_state.chat_history.append({"role": "assistant", "content": ai_reply})
+    
+    # Refresh app to show new messages
+    st.rerun()
 
 # -----------------------------
-# ORDER FORM
+# QUICK WHATSAPP ORDER
 # -----------------------------
-with st.expander("📦 Quick Order / Inquiry Form"):
-    with st.form("order_form"):
+st.markdown("---")
+with st.expander("🚀 Instant Order Booking"):
+    with st.form("quick_order"):
         c1, c2 = st.columns(2)
-        name = c1.text_input("Name")
-        phone = c2.text_input("Phone Number")
-        prod = st.selectbox("Product", ["UltraTech Cement", "Weather Pro", "Iron Rings"])
-        qty = st.number_input("Quantity", min_value=1)
+        u_name = c1.text_input("Customer Name")
+        u_qty = c2.text_input("Quantity")
+        u_prod = st.selectbox("Product", ["UltraTech Cement", "Weather Pro", "Iron Rings"])
         
-        if st.form_submit_button("Generate WhatsApp Link"):
-            msg = f"Hi Shikhar Traders, I'm {name}. I want to inquire about {qty} units of {prod}."
-            wa_url = f"https://wa.me/{BUSINESS['phones'][0].replace('+', '')}?text={quote(msg)}"
-            st.markdown(f"👉 [Click to send WhatsApp]({wa_url})")
-
-# -----------------------------
-# ADMIN PANEL
-# -----------------------------
-if admin_pin == "1122":
-    st.divider()
-    st.subheader("📊 Business Analytics")
-    st.info("Admin mode active. Chat logs and leads would be displayed here.")
+        if st.form_submit_button("Book via WhatsApp"):
+            msg = f"Order Inquiry:\nName: {u_name}\nProduct: {u_prod}\nQty: {u_qty}"
+            wa_link = f"https://wa.me/{CONTACT_NUMBER.replace('+', '')}?text={quote(msg)}"
+            st.markdown(f"✅ [Click here to send details to Shikhar Traders]({wa_link})")
