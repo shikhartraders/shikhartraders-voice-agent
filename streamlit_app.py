@@ -8,45 +8,113 @@ from datetime import datetime
 # PAGE CONFIG
 # -----------------------------
 st.set_page_config(
-    page_title="Shikhar Traders Voice Agent (Premium)",
+    page_title="Shikhar Traders Voice Agent (V4 Animated)",
     page_icon="🎙️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # -----------------------------
-# PREMIUM UI CSS
+# V4 ANIMATED PREMIUM CSS
 # -----------------------------
 st.markdown("""
 <style>
+/* MAIN BACKGROUND */
 .stApp{
-    background:
-        radial-gradient(circle at 15% 10%, rgba(0,255,255,0.14), transparent 45%),
-        radial-gradient(circle at 85% 20%, rgba(168,85,247,0.18), transparent 42%),
-        radial-gradient(circle at 50% 95%, rgba(0,255,120,0.12), transparent 50%),
-        linear-gradient(120deg, #05060b, #070a14, #05060b);
-    color: #ffffff;
+    background: #05060b;
+    color: white;
+    overflow-x: hidden;
 }
+
+/* Animated gradient layer */
+.bg-anim {
+    position: fixed;
+    inset: 0;
+    z-index: -3;
+    background:
+        radial-gradient(circle at 20% 15%, rgba(0,255,255,0.20), transparent 45%),
+        radial-gradient(circle at 85% 20%, rgba(168,85,247,0.22), transparent 45%),
+        radial-gradient(circle at 50% 95%, rgba(0,255,120,0.18), transparent 50%),
+        linear-gradient(120deg, #05060b, #070a14, #05060b);
+    animation: bgMove 12s ease-in-out infinite;
+}
+@keyframes bgMove {
+    0% { filter: hue-rotate(0deg) brightness(1); transform: scale(1); }
+    50% { filter: hue-rotate(30deg) brightness(1.15); transform: scale(1.02); }
+    100% { filter: hue-rotate(0deg) brightness(1); transform: scale(1); }
+}
+
+/* Floating blobs */
+.blob {
+    position: fixed;
+    width: 340px;
+    height: 340px;
+    border-radius: 999px;
+    filter: blur(40px);
+    opacity: 0.35;
+    z-index: -2;
+    animation: floaty 10s ease-in-out infinite;
+}
+.blob.b1 { left: -120px; top: 90px; background: rgba(0,245,255,0.8); }
+.blob.b2 { right: -140px; top: 140px; background: rgba(168,85,247,0.85); animation-delay: 2s; }
+.blob.b3 { left: 30%; bottom: -160px; background: rgba(0,255,120,0.75); animation-delay: 4s; }
+
+@keyframes floaty {
+    0% { transform: translateY(0px) translateX(0px) scale(1); }
+    50% { transform: translateY(-30px) translateX(15px) scale(1.05); }
+    100% { transform: translateY(0px) translateX(0px) scale(1); }
+}
+
+/* Tiny particle shimmer */
+.particles {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-image:
+        radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1px);
+    background-size: 55px 55px;
+    opacity: 0.18;
+    animation: drift 18s linear infinite;
+}
+@keyframes drift {
+    0% { transform: translateY(0px); }
+    100% { transform: translateY(-120px); }
+}
+
+/* Sidebar */
 section[data-testid="stSidebar"]{
     background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
     border-right: 1px solid rgba(255,255,255,0.10);
     backdrop-filter: blur(18px);
 }
+
+/* Title */
 .glow-title{
-    font-size: 44px;
-    font-weight: 900;
+    font-size: 46px;
+    font-weight: 950;
     letter-spacing: 0.6px;
     background: linear-gradient(90deg, #00f5ff, #a855f7, #ff4fd8, #00ff88);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     text-shadow: 0px 0px 35px rgba(168,85,247,0.25);
-    animation: shimmer 4s ease-in-out infinite;
 }
-@keyframes shimmer{
-    0%{filter: brightness(1);}
-    50%{filter: brightness(1.25);}
-    100%{filter: brightness(1);}
+
+/* Typing effect */
+.typing {
+    font-size: 14px;
+    opacity: 0.85;
+    border-right: 2px solid rgba(255,255,255,0.7);
+    white-space: nowrap;
+    overflow: hidden;
+    width: 0;
+    animation: typing 4s steps(50, end) infinite alternate;
 }
+@keyframes typing {
+    from { width: 0; }
+    to { width: 520px; }
+}
+
+/* Glass cards */
 .glass{
     background: rgba(255,255,255,0.06);
     border: 1px solid rgba(255,255,255,0.12);
@@ -55,6 +123,8 @@ section[data-testid="stSidebar"]{
     padding: 18px;
     backdrop-filter: blur(16px);
 }
+
+/* Chat bubble */
 .chatbox{
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.10);
@@ -63,19 +133,23 @@ section[data-testid="stSidebar"]{
     margin: 10px 0px;
     backdrop-filter: blur(14px);
 }
+
+/* Badge */
 .badge{
     display:inline-block;
     padding: 6px 10px;
     border-radius: 999px;
-    font-weight: 800;
+    font-weight: 900;
     font-size: 12px;
     border: 1px solid rgba(255,255,255,0.10);
     background: rgba(255,255,255,0.06);
 }
+
+/* Buttons */
 .stButton>button{
     border-radius: 14px !important;
     padding: 10px 16px !important;
-    font-weight: 800 !important;
+    font-weight: 900 !important;
     border: 1px solid rgba(255,255,255,0.14) !important;
     background: linear-gradient(135deg, rgba(0,245,255,0.18), rgba(168,85,247,0.18), rgba(255,79,216,0.12)) !important;
     color: #fff !important;
@@ -93,6 +167,12 @@ hr{
     margin: 14px 0;
 }
 </style>
+
+<div class="bg-anim"></div>
+<div class="blob b1"></div>
+<div class="blob b2"></div>
+<div class="blob b3"></div>
+<div class="particles"></div>
 """, unsafe_allow_html=True)
 
 # -----------------------------
@@ -158,7 +238,7 @@ def lang_pack(lang):
         "hint": "UltraTech products / order / delivery / payment के बारे में पूछिए…",
         "missing_key": "⚠️ OpenAI API Key नहीं डाला गया। Sidebar में डालिए।",
         "cooldown": "⏳ अगला message भेजने से पहले 3 सेकंड रुकिए (rate-limit avoid)."
-        }
+    }
 
 # -----------------------------
 # OPENAI CHAT
@@ -169,11 +249,9 @@ def openai_chat(api_key, question, kb, lang="English"):
 
     system_prompt = f"""
 You are a premium customer support agent for {BUSINESS['name']} (UltraTech only).
-You must be fast, clear, polite.
 Always answer in {lang}.
+Be short, clear, and friendly.
 If user asks final price/stock/payment confirmation -> ask them to call/WhatsApp {BUSINESS['phones'][0]} / {BUSINESS['phones'][1]} or email {BUSINESS['email']}.
-If user asks non-UltraTech -> say we sell UltraTech only.
-Keep answers short and actionable.
 """
 
     payload = {
@@ -233,7 +311,7 @@ if "last_msg_time" not in st.session_state:
 # -----------------------------
 # SIDEBAR
 # -----------------------------
-st.sidebar.markdown("## 🔑 Settings")
+st.sidebar.markdown("## ⚙️ Settings")
 openai_key = st.sidebar.text_input("OpenAI API Key", value="", type="password")
 lang = st.sidebar.selectbox("🌍 Language", ["English", "Hinglish", "Hindi"])
 voice = st.sidebar.selectbox("🎙️ Voice", ["coral", "alloy", "verse", "sage"])
@@ -251,7 +329,7 @@ c1, c2 = st.columns([1.7, 1.0])
 
 with c1:
     st.markdown(f"<div class='glow-title'>{BUSINESS['name']} Voice Agent</div>", unsafe_allow_html=True)
-    st.caption("Premium • UltraTech Only • Fast + Stable • WhatsApp Order + Voice + Form")
+    st.markdown("<div class='typing'>UltraTech Only • Voice Replies • WhatsApp Orders • Premium Animated UI</div>", unsafe_allow_html=True)
 
 with c2:
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
@@ -292,7 +370,7 @@ st.write("")
 # ORDER BOOKING FORM
 # -----------------------------
 st.markdown("<div class='glass'>", unsafe_allow_html=True)
-st.markdown("### 📦 Order Booking Form (Premium)")
+st.markdown("### 📦 Order Booking Form (Animated V4)")
 
 o1, o2, o3 = st.columns(3)
 with o1:
@@ -318,7 +396,7 @@ q1, q2 = st.columns(2)
 with q1:
     quantity = st.text_input("Quantity (bags/litres/pieces)")
 with q2:
-    delivery_city = st.text_input("City / Area (for delivery check)")
+    delivery_city = st.text_input("City / Area")
 
 address = st.text_area("Full Address (optional)")
 note = st.text_area("Extra Note (optional)")
@@ -364,7 +442,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 st.write("")
 
 # -----------------------------
-# ORDERS DASHBOARD (OPEN)
+# ORDERS DASHBOARD
 # -----------------------------
 st.markdown("<div class='glass'>", unsafe_allow_html=True)
 st.markdown("### 📊 Orders Dashboard (Open)")
