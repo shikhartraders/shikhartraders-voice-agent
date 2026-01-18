@@ -1,417 +1,328 @@
-from typing import List, Dict, Optional
 import os
 import time
-import uuid
-import tempfile
-from datetime import datetime
-import asyncio
-
 import streamlit as st
-from dotenv import load_dotenv
+from typing import List, Dict, Any
 
-from firecrawl import FirecrawlApp
+from openai import OpenAI
 from qdrant_client import QdrantClient
-from qdrant_client.http import models
-from qdrant_client.http.models import Distance, VectorParams
+from qdrant_client.http.models import Distance, VectorParams, PointStruct
 from fastembed import TextEmbedding
 
-from agents import Agent, Runner
-from openai import AsyncOpenAI
-
-load_dotenv()
+from firecrawl import FirecrawlApp
 
 
-# ---------------------------
-# Session State
-# ---------------------------
-def init_session_state():
-    defaults = {
-        "initialized": False,
-        "qdrant_url": "",
-        "qdrant_api_key": "",
-        "firecrawl_api_key": "",
-        "openai_api_key": "",
-        "doc_url": "",
-        "setup_complete": False,
-        "client": None,
-        "embedding_model": None,
-        "processor_agent": None,
-        "tts_agent": None,
-        "selected_voice": "coral",
-        "crawl_limit": 5,
-    }
-
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
+# =========================
+# CONFIG
+# =========================
+COLLECTION_NAME = "shikhar_traders_kb"
+EMBED_MODEL = "BAAI/bge-small-en-v1.5"  # FastEmbed model
+OPENAI_MODEL = "gpt-4o-mini"  # fast + good for support
+TTS_MODEL = "gpt-4o-mini-tts"
 
 
-# ---------------------------
-# Qdrant Setup
-# ---------------------------
-def setup_qdrant_collection(
-    qdrant_url: str,
-    qdrant_api_key: str,
-    collection_name: str = "docs_embeddings",
-):
-    client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+# =========================
+# PREMIUM UI CSS
+# =========================
+CUSTOM_CSS = """
+<style>
+/* Background gradient + premium glass */
+.stApp {
+    background: radial-gradient(circle at top left, rgba(0,255,255,0.12), transparent 40%),
+                radial-gradient(circle at bottom right, rgba(255,0,255,0.12), transparent 40%),
+                linear-gradient(135deg, #05060a 0%, #070b18 50%, #05060a 100%);
+    color: white;
+}
 
-    embedding_model = TextEmbedding()
-    test_embedding = list(embedding_model.embed(["test"]))[0]
-    embedding_dim = len(test_embedding)
+/* Sidebar glass */
+section[data-testid="stSidebar"] {
+    background: rgba(255,255,255,0.04);
+    border-right: 1px solid rgba(255,255,255,0.10);
+    backdrop-filter: blur(14px);
+}
 
-    try:
-        client.create_collection(
-            collection_name=collection_name,
-            vectors_config=VectorParams(size=embedding_dim, distance=Distance.COSINE),
-        )
-    except Exception as e:
-        if "already exists" not in str(e).lower():
-            raise e
+/* Buttons */
+.stButton > button {
+    border-radius: 14px !important;
+    padding: 10px 16px !important;
+    background: linear-gradient(90deg, #00e5ff, #b100ff) !important;
+    border: 0px !important;
+    color: white !important;
+    font-weight: 700 !important;
+    box-shadow: 0px 10px 30px rgba(0,0,0,0.35);
+    transition: transform 0.15s ease-in-out;
+}
+.stButton > button:hover {
+    transform: translateY(-2px);
+}
 
-    return client, embedding_model
+/* Cards */
+.block-container {
+    padding-top: 1.2rem;
+}
+.premium-card {
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.10);
+    box-shadow: 0px 18px 40px rgba(0,0,0,0.25);
+}
 
-
-# ---------------------------
-# Firecrawl (FIXED)
-# ---------------------------
-def crawl_documentation(
-    firecrawl_api_key: str,
-    url: str,
-    limit: int = 5,
-):
-    firecrawl = FirecrawlApp(api_key=firecrawl_api_key)
-    pages = []
-
-    # UPDATED Firecrawl call (NO params=)
-    response = firecrawl.crawl_url(
-        url=url,
-        limit=limit,
-        scrape_options={
-            "formats": ["markdown"]
-        },
-    )
-
-    for page in response.get("data", []):
-        content = page.get("markdown", "") or ""
-        metadata = page.get("metadata", {}) or {}
-        source_url = metadata.get("sourceURL", url)
-
-        pages.append(
-            {
-                "content": content,
-                "url": source_url,
-                "metadata": {
-                    "title": metadata.get("title", ""),
-                    "description": metadata.get("description", ""),
-                    "language": metadata.get("language", "en"),
-                    "crawl_date": datetime.now().isoformat(),
-                },
-            }
-        )
-
-    return pages
+/* Animated Title */
+@keyframes glow {
+  0% { text-shadow: 0 0 8px rgba(0,229,255,0.35); }
+  50% { text-shadow: 0 0 18px rgba(177,0,255,0.40); }
+  100% { text-shadow: 0 0 8px rgba(0,229,255,0.35); }
+}
+.glow-title {
+  animation: glow 2.2s infinite ease-in-out;
+}
+.small-muted {
+  color: rgba(255,255,255,0.70);
+  font-size: 0.95rem;
+}
+</style>
+"""
 
 
-# ---------------------------
-# Store Embeddings
-# ---------------------------
-def store_embeddings(
-    client: QdrantClient,
-    embedding_model: TextEmbedding,
-    pages: List[Dict],
-    collection_name: str,
-):
-    for page in pages:
-        if not page.get("content"):
-            continue
+# =========================
+# HELPERS
+# =========================
+def chunk_text(text: str, chunk_size: int = 900) -> List[str]:
+    """Simple chunking by length for embedding."""
+    text = text.strip()
+    if not text:
+        return []
+    chunks = []
+    i = 0
+    while i < len(text):
+        chunks.append(text[i:i + chunk_size])
+        i += chunk_size
+    return chunks
 
-        embedding = list(embedding_model.embed([page["content"]]))[0]
 
-        client.upsert(
-            collection_name=collection_name,
-            points=[
-                models.PointStruct(
-                    id=str(uuid.uuid4()),
-                    vector=embedding.tolist(),
-                    payload={
-                        "content": page["content"],
-                        "url": page["url"],
-                        **page["metadata"],
-                    },
-                )
-            ],
+def ensure_collection(qdrant: QdrantClient, vector_size: int):
+    """Create collection if not exists."""
+    existing = [c.name for c in qdrant.get_collections().collections]
+    if COLLECTION_NAME not in existing:
+        qdrant.create_collection(
+            collection_name=COLLECTION_NAME,
+            vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE)
         )
 
 
-# ---------------------------
-# Agents
-# ---------------------------
-def setup_agents(openai_api_key: str):
-    os.environ["OPENAI_API_KEY"] = openai_api_key
+def add_documents_to_qdrant(qdrant: QdrantClient, embedder: TextEmbedding, docs: List[str]):
+    """Embed and upload docs."""
+    embeddings = list(embedder.embed(docs))
+    points = []
+    for idx, (doc, vec) in enumerate(zip(docs, embeddings)):
+        points.append(
+            PointStruct(
+                id=int(time.time() * 1000) + idx,
+                vector=vec.tolist(),
+                payload={"text": doc}
+            )
+        )
+    qdrant.upsert(collection_name=COLLECTION_NAME, points=points)
 
-    processor_agent = Agent(
-        name="Documentation Processor",
-        instructions="""
-You are a helpful Shikhar Traders support assistant.
 
-Rules:
-- Answer in a friendly, professional tone.
-- Keep answers short and clear.
-- If user asks for final price, always say prices are approximate and confirm on call/WhatsApp.
-- For payment confirmation, always ask customer to contact on phone/email.
-- Mention products are UltraTech only.
-- Provide store location link if asked.
+def search_docs(qdrant: QdrantClient, embedder: TextEmbedding, query: str, top_k: int = 5) -> List[str]:
+    qvec = list(embedder.embed([query]))[0].tolist()
+    hits = qdrant.search(collection_name=COLLECTION_NAME, query_vector=qvec, limit=top_k)
+    return [h.payload.get("text", "") for h in hits if h.payload]
 
-Return response in a format easy to speak out loud.
-""",
-        model="gpt-4o",
+
+def build_prompt(context_chunks: List[str], user_question: str) -> str:
+    context = "\n\n---\n\n".join(context_chunks[:5])
+    return f"""
+You are Shikhar Traders AI Voice Agent.
+
+Your job:
+- Answer customer queries about UltraTech products ONLY.
+- Use simple, friendly tone.
+- If price is asked, tell it is approximate and confirm on call/WhatsApp.
+- For payment/order confirmation, ask customer to contact directly.
+- If question is not in docs, respond politely and provide contact.
+
+CONTACT:
+Phone/WhatsApp: 07355969446, 09450805567
+Email: shikhartraders@zohomail.com
+
+CONTEXT (Knowledge Base):
+{context}
+
+USER QUESTION:
+{user_question}
+
+Answer in the same language style as user (English / Hinglish / Hindi).
+Keep it clear, short, helpful, and sales-friendly.
+""".strip()
+
+
+def generate_answer(openai_client: OpenAI, prompt: str) -> str:
+    resp = openai_client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": "You are a helpful customer support agent."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.3,
     )
-
-    tts_agent = Agent(
-        name="Text-to-Speech Agent",
-        instructions="""
-Convert the response into natural spoken Hindi+English style (Hinglish).
-Use short sentences, clear pauses, and friendly tone.
-""",
-        model="gpt-4o-mini-tts",
-    )
-
-    return processor_agent, tts_agent
+    return resp.choices[0].message.content.strip()
 
 
-# ---------------------------
-# Query Processing
-# ---------------------------
-async def process_query(
-    query: str,
-    client: QdrantClient,
-    embedding_model: TextEmbedding,
-    processor_agent: Agent,
-    tts_agent: Agent,
-    collection_name: str,
-    openai_api_key: str,
-    voice: str,
-):
-    query_embedding = list(embedding_model.embed([query]))[0]
-
-    search_response = client.query_points(
-        collection_name=collection_name,
-        query=query_embedding.tolist(),
-        limit=3,
-        with_payload=True,
-    )
-
-    search_results = search_response.points if hasattr(search_response, "points") else []
-
-    if not search_results:
-        return {
-            "status": "error",
-            "error": "No relevant documents found in the vector database.",
-        }
-
-    context = "Use the following knowledge base content:\n\n"
-    sources = []
-
-    for result in search_results:
-        payload = result.payload or {}
-        url = payload.get("url", "Unknown URL")
-        content = payload.get("content", "")
-
-        if url not in sources:
-            sources.append(url)
-
-        context += f"\nSOURCE: {url}\nCONTENT:\n{content}\n"
-
-    context += f"\n\nUSER QUESTION: {query}\n"
-    context += "\nAnswer now."
-
-    processor_result = await Runner.run(processor_agent, context)
-    processor_response = processor_result.final_output
-
-    # TTS style guidance (optional)
-    tts_result = await Runner.run(tts_agent, processor_response)
-    tts_instructions = tts_result.final_output
-
-    async_openai = AsyncOpenAI(api_key=openai_api_key)
-
-    audio_response = await async_openai.audio.speech.create(
-        model="gpt-4o-mini-tts",
+def generate_tts(openai_client: OpenAI, text: str, voice: str) -> bytes:
+    audio = openai_client.audio.speech.create(
+        model=TTS_MODEL,
         voice=voice,
-        input=processor_response,
-        instructions=tts_instructions,
-        response_format="mp3",
+        input=text
+    )
+    return audio.read()
+
+
+# =========================
+# STREAMLIT APP
+# =========================
+st.set_page_config(page_title="Shikhar Traders Voice Agent", page_icon="🎙️", layout="wide")
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+# Title
+st.markdown(
+    """
+    <div class="premium-card">
+        <h1 class="glow-title">🎙️ Shikhar Traders Voice Agent</h1>
+        <p class="small-muted">ChatGPT-style support + Voice replies (UltraTech Only)</p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.write("")
+
+# Sidebar configuration
+with st.sidebar:
+    st.markdown("## 🔑 Configuration")
+
+    qdrant_url = st.text_input("Qdrant URL", type="default")
+    qdrant_api_key = st.text_input("Qdrant API Key", type="password")
+    firecrawl_api_key = st.text_input("Firecrawl API Key", type="password")
+    openai_api_key = st.text_input("OpenAI API Key", type="password")
+
+    st.markdown("---")
+    doc_url = st.text_input("Documentation URL", placeholder="Paste RAW GitHub doc link here")
+
+    st.markdown("## 🎤 Voice Settings")
+    voice = st.selectbox(
+        "Select Voice",
+        ["alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse"],
+        index=3
     )
 
-    temp_dir = tempfile.gettempdir()
-    audio_path = os.path.join(temp_dir, f"response_{uuid.uuid4()}.mp3")
+    crawl_limit = st.slider("Crawl Pages Limit", 1, 10, 5)
 
-    with open(audio_path, "wb") as f:
-        f.write(audio_response.content)
-
-    return {
-        "status": "success",
-        "text_response": processor_response,
-        "audio_path": audio_path,
-        "sources": sources,
-    }
+    init_btn = st.button("🚀 Initialize System")
+    st.markdown("---")
+    clear_btn = st.button("🧹 Clear Chat")
 
 
-# ---------------------------
-# Sidebar UI
-# ---------------------------
-def sidebar_config():
-    with st.sidebar:
-        st.title("🔑 Configuration")
+# Chat state
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-        st.session_state.qdrant_url = st.text_input(
-            "Qdrant URL", value=st.session_state.qdrant_url, type="password"
-        )
-        st.session_state.qdrant_api_key = st.text_input(
-            "Qdrant API Key", value=st.session_state.qdrant_api_key, type="password"
-        )
-        st.session_state.firecrawl_api_key = st.text_input(
-            "Firecrawl API Key", value=st.session_state.firecrawl_api_key, type="password"
-        )
-        st.session_state.openai_api_key = st.text_input(
-            "OpenAI API Key", value=st.session_state.openai_api_key, type="password"
-        )
+if clear_btn:
+    st.session_state.messages = []
+    st.success("Chat cleared ✅")
 
-        st.markdown("---")
 
-        st.session_state.doc_url = st.text_input(
-            "Documentation URL",
-            value=st.session_state.doc_url,
-            placeholder="Paste RAW docs link here",
-        )
+# Initialize system
+if init_btn:
+    if not (qdrant_url and qdrant_api_key and firecrawl_api_key and openai_api_key and doc_url):
+        st.error("Please fill all keys + Documentation URL first.")
+    else:
+        try:
+            st.info("Initializing... please wait ⏳")
 
-        st.markdown("---")
+            # Qdrant
+            st.write("🔗 Connecting Qdrant...")
+            qdrant = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
 
-        voices = [
-            "alloy",
-            "ash",
-            "ballad",
-            "coral",
-            "echo",
-            "fable",
-            "onyx",
-            "nova",
-            "sage",
-            "shimmer",
-            "verse",
-        ]
+            # Embedder
+            embedder = TextEmbedding(model_name=EMBED_MODEL)
+            vector_size = len(list(embedder.embed(["test"]))[0])
+            ensure_collection(qdrant, vector_size)
 
-        st.session_state.selected_voice = st.selectbox(
-            "Select Voice",
-            options=voices,
-            index=voices.index(st.session_state.selected_voice),
-        )
+            # Firecrawl
+            st.write("🔥 Crawling documentation...")
+            firecrawl = FirecrawlApp(api_key=firecrawl_api_key)
 
-        st.session_state.crawl_limit = st.slider("Crawl Pages Limit", 1, 10, 5)
+            # ✅ FIXED CALL (NO limit= directly)
+            crawl_data = firecrawl.crawl_url(
+                doc_url,
+                params={
+                    "limit": crawl_limit,
+                    "scrapeOptions": {"formats": ["markdown"]}
+                }
+            )
 
-        if st.button("Initialize System", type="primary"):
-            if all(
-                [
-                    st.session_state.qdrant_url,
-                    st.session_state.qdrant_api_key,
-                    st.session_state.firecrawl_api_key,
-                    st.session_state.openai_api_key,
-                    st.session_state.doc_url,
-                ]
-            ):
-                try:
-                    st.info("Connecting Qdrant...")
-                    client, embedding_model = setup_qdrant_collection(
-                        st.session_state.qdrant_url,
-                        st.session_state.qdrant_api_key,
-                        "docs_embeddings",
-                    )
+            # Extract markdown text
+            pages = crawl_data.get("data", [])
+            all_text = ""
+            for p in pages:
+                md = p.get("markdown", "") or ""
+                all_text += "\n\n" + md
 
-                    st.info("Crawling documentation...")
-                    pages = crawl_documentation(
-                        st.session_state.firecrawl_api_key,
-                        st.session_state.doc_url,
-                        limit=st.session_state.crawl_limit,
-                    )
-
-                    st.info("Storing embeddings...")
-                    store_embeddings(client, embedding_model, pages, "docs_embeddings")
-
-                    processor_agent, tts_agent = setup_agents(st.session_state.openai_api_key)
-
-                    st.session_state.client = client
-                    st.session_state.embedding_model = embedding_model
-                    st.session_state.processor_agent = processor_agent
-                    st.session_state.tts_agent = tts_agent
-                    st.session_state.setup_complete = True
-
-                    st.success(f"✅ Initialized successfully! Pages crawled: {len(pages)}")
-                except Exception as e:
-                    st.error(f"❌ Setup failed: {str(e)}")
+            if not all_text.strip():
+                st.error("No text found from documentation URL. Please check the link.")
             else:
-                st.error("Please fill in all required fields!")
+                # Chunk + store
+                chunks = chunk_text(all_text, chunk_size=900)
+                add_documents_to_qdrant(qdrant, embedder, chunks)
+
+                st.session_state.qdrant = qdrant
+                st.session_state.embedder = embedder
+                st.session_state.openai = OpenAI(api_key=openai_api_key)
+
+                st.success("System Initialized ✅ Now ask questions!")
+
+        except Exception as e:
+            st.error(f"Setup failed: {e}")
 
 
-# ---------------------------
-# Main App
-# ---------------------------
-def run_streamlit():
-    st.set_page_config(
-        page_title="Shikhar Traders Voice Agent",
-        page_icon="🎙️",
-        layout="wide",
-    )
-
-    init_session_state()
-    sidebar_config()
-
-    st.title("🎙️ Shikhar Traders Voice Agent")
-    st.caption("ChatGPT-style support + voice replies (UltraTech Only)")
-
-    if not st.session_state.setup_complete:
-        st.info("👈 Add keys + docs URL and click Initialize System.")
-        return
-
-    query = st.text_input(
-        "Ask a question (English / Hinglish / Hindi)",
-        placeholder="Example: UltraTech Super ka price kya hai?",
-    )
-
-    if query:
-        with st.status("Processing...", expanded=True) as status:
-            try:
-                result = asyncio.run(
-                    process_query(
-                        query=query,
-                        client=st.session_state.client,
-                        embedding_model=st.session_state.embedding_model,
-                        processor_agent=st.session_state.processor_agent,
-                        tts_agent=st.session_state.tts_agent,
-                        collection_name="docs_embeddings",
-                        openai_api_key=st.session_state.openai_api_key,
-                        voice=st.session_state.selected_voice,
-                    )
-                )
-
-                if result["status"] == "success":
-                    status.update(label="✅ Done", state="complete")
-                    st.subheader("Answer")
-                    st.write(result["text_response"])
-
-                    st.subheader(f"🔊 Audio ({st.session_state.selected_voice})")
-                    st.audio(result["audio_path"], format="audio/mp3")
-
-                    st.subheader("Sources")
-                    for s in result["sources"]:
-                        st.write("-", s)
-                else:
-                    status.update(label="❌ Error", state="error")
-                    st.error(result.get("error", "Unknown error"))
-
-            except Exception as e:
-                status.update(label="❌ Error", state="error")
-                st.error(str(e))
+# Show chat messages
+st.write("")
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+        if msg.get("audio_bytes"):
+            st.audio(msg["audio_bytes"], format="audio/mp3")
 
 
-if __name__ == "__main__":
-    run_streamlit()
+# Chat input
+user_question = st.chat_input("Ask about UltraTech products / order / delivery / payment...")
+
+if user_question:
+    if "qdrant" not in st.session_state or "embedder" not in st.session_state or "openai" not in st.session_state:
+        st.error("Please Initialize System first from the sidebar.")
+    else:
+        st.session_state.messages.append({"role": "user", "content": user_question})
+
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                qdrant = st.session_state.qdrant
+                embedder = st.session_state.embedder
+                openai_client = st.session_state.openai
+
+                context_chunks = search_docs(qdrant, embedder, user_question, top_k=5)
+                prompt = build_prompt(context_chunks, user_question)
+                answer = generate_answer(openai_client, prompt)
+
+                st.markdown(answer)
+
+                # Generate Voice
+                try:
+                    audio_bytes = generate_tts(openai_client, answer, voice=voice)
+                    st.audio(audio_bytes, format="audio/mp3")
+                except Exception as e:
+                    audio_bytes = None
+                    st.warning(f"TTS error: {e}")
+
+        st.session_state.messages.append({"role": "assistant", "content": answer, "audio_bytes": audio_bytes})
