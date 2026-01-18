@@ -4,5 +4,5 @@ openai
 qdrant-client
 fastembed
 openai-agents
-firecrawl-py==0.0.16
+requests
 nest_asyncio
