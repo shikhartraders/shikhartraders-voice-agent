@@ -2,7 +2,7 @@ streamlit
 python-dotenv
 openai
 qdrant-client
-firecrawl-py
 fastembed
 openai-agents
+firecrawl-py==0.0.16
 nest_asyncio
