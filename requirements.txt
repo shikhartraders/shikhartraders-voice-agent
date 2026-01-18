@@ -1,0 +1,8 @@
+streamlit
+python-dotenv
+openai
+qdrant-client
+firecrawl-py
+fastembed
+openai-agents
+nest_asyncio
