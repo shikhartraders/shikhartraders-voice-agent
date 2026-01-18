@@ -1,67 +1,100 @@
 import streamlit as st
 import requests
 import pandas as pd
-import time
 from datetime import datetime
+import time
 
-# -----------------------------
+# =========================
 # PAGE CONFIG
-# -----------------------------
+# =========================
 st.set_page_config(
-    page_title="Shikhar Traders Voice Agent (V6 Premium)",
+    page_title="Shikhar Traders Voice Agent (V7 Premium)",
     page_icon="🎙️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# -----------------------------
-# PREMIUM UI CSS
-# -----------------------------
+# =========================
+# PREMIUM CSS (CLEAN + ANIMATED)
+# =========================
 st.markdown("""
 <style>
+/* App background */
 .stApp{
     background:#05060b;
-    color:#fff;
+    color:#ffffff;
 }
+
+/* Animated gradient blobs */
 .bg{
-    position:fixed; inset:0; z-index:-5;
+    position:fixed; inset:0; z-index:-10;
     background:
-        radial-gradient(circle at 18% 12%, rgba(0,255,255,0.22), transparent 45%),
-        radial-gradient(circle at 85% 22%, rgba(168,85,247,0.24), transparent 42%),
-        radial-gradient(circle at 55% 95%, rgba(0,255,120,0.18), transparent 50%),
+        radial-gradient(circle at 15% 15%, rgba(0,255,255,0.20), transparent 45%),
+        radial-gradient(circle at 85% 20%, rgba(168,85,247,0.20), transparent 42%),
+        radial-gradient(circle at 50% 95%, rgba(0,255,120,0.16), transparent 50%),
         linear-gradient(120deg, #05060b, #070a14, #05060b);
-    animation:bgPulse 10s ease-in-out infinite;
+    animation:bgFlow 12s ease-in-out infinite;
 }
-@keyframes bgPulse{
+@keyframes bgFlow{
     0%{filter:hue-rotate(0deg) brightness(1); transform:scale(1);}
-    50%{filter:hue-rotate(25deg) brightness(1.15); transform:scale(1.02);}
+    50%{filter:hue-rotate(22deg) brightness(1.15); transform:scale(1.02);}
     100%{filter:hue-rotate(0deg) brightness(1); transform:scale(1);}
 }
+
+/* Fade-in animation */
+.fadein{
+    animation:fadeInUp 0.6s ease both;
+}
+@keyframes fadeInUp{
+    from{opacity:0; transform:translateY(12px);}
+    to{opacity:1; transform:translateY(0px);}
+}
+
+/* Glass card */
 .card{
     border-radius:22px;
-    padding:18px;
+    padding:18px 18px;
     background: rgba(255,255,255,0.06);
     border: 1px solid rgba(255,255,255,0.12);
-    box-shadow: 0 22px 70px rgba(0,0,0,0.48);
+    box-shadow: 0 22px 70px rgba(0,0,0,0.50);
     backdrop-filter: blur(16px);
 }
-.glow-title{
-    font-size: 44px;
-    font-weight: 950;
+
+/* Premium title */
+.title{
+    font-size:44px;
+    font-weight:950;
+    line-height:1.05;
     background: linear-gradient(90deg, #00f5ff, #a855f7, #ff4fd8, #00ff88);
     -webkit-background-clip:text;
     -webkit-text-fill-color:transparent;
+    animation: shimmer 4s linear infinite;
+    background-size: 200% 200%;
 }
+@keyframes shimmer{
+    0%{background-position:0% 50%;}
+    100%{background-position:100% 50%;}
+}
+
+.sub{
+    color:rgba(255,255,255,0.70);
+    font-size:14px;
+    margin-top:6px;
+}
+
+/* Small badge */
 .badge{
     display:inline-block;
     padding: 6px 10px;
     border-radius: 999px;
-    font-weight: 950;
+    font-weight: 900;
     font-size: 12px;
     border: 1px solid rgba(255,255,255,0.10);
     background: rgba(255,255,255,0.06);
 }
-.chatbox{
+
+/* Chat bubbles */
+.bubble{
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.10);
     border-radius: 18px;
@@ -69,13 +102,35 @@ st.markdown("""
     margin: 10px 0px;
     backdrop-filter: blur(14px);
 }
+
+/* Buttons glow */
+.stButton>button{
+    border-radius: 14px !important;
+    padding: 10px 14px !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    background: rgba(255,255,255,0.06) !important;
+    color: white !important;
+    font-weight: 800 !important;
+    transition: all .25s ease !important;
+}
+.stButton>button:hover{
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 18px 40px rgba(0,0,0,0.55);
+    border: 1px solid rgba(0,245,255,0.35) !important;
+}
+
+/* Sidebar cleanup */
+section[data-testid="stSidebar"]{
+    background: rgba(10,12,18,0.85);
+    border-right: 1px solid rgba(255,255,255,0.08);
+}
 </style>
 <div class="bg"></div>
 """, unsafe_allow_html=True)
 
-# -----------------------------
+# =========================
 # BUSINESS DATA
-# -----------------------------
+# =========================
 BUSINESS = {
     "name": "Shikhar Traders",
     "phones": ["07355969446", "09450805567"],
@@ -113,16 +168,15 @@ RULES:
 - Final price/stock/payment confirmation on call/WhatsApp/email.
 """
 
-# -----------------------------
+# =========================
 # HELPERS
-# -----------------------------
+# =========================
 def load_docs(raw_url: str) -> str:
-    """Fetch documentation markdown from RAW github link."""
     if not raw_url or "raw.githubusercontent.com" not in raw_url:
         return ""
     try:
         r = requests.get(raw_url, timeout=20)
-        if r.status_code == 200:
+        if r.status_code == 200 and len(r.text.strip()) > 30:
             return r.text
         return ""
     except:
@@ -134,8 +188,8 @@ def openai_chat(api_key, question, kb_text, lang="English"):
 
     system_prompt = f"""
 You are a premium customer support agent for {BUSINESS['name']} (UltraTech only).
-Always answer in {lang}.
-Be short, clear, and friendly.
+Answer in {lang}.
+Be fast, short, clear, friendly, and professional.
 If user asks final price/stock/payment confirmation -> ask them to call/WhatsApp {BUSINESS['phones'][0]} / {BUSINESS['phones'][1]} or email {BUSINESS['email']}.
 """
 
@@ -177,9 +231,9 @@ def make_whatsapp_link(phone, message):
     msg = requests.utils.quote(message)
     return f"https://wa.me/{phone_clean}?text={msg}"
 
-# -----------------------------
+# =========================
 # SESSION
-# -----------------------------
+# =========================
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "orders" not in st.session_state:
@@ -188,10 +242,12 @@ if "last_answer" not in st.session_state:
     st.session_state.last_answer = ""
 if "docs_text" not in st.session_state:
     st.session_state.docs_text = ""
+if "tts_last_time" not in st.session_state:
+    st.session_state.tts_last_time = 0
 
-# -----------------------------
-# SIDEBAR CONFIG
-# -----------------------------
+# =========================
+# SIDEBAR
+# =========================
 st.sidebar.markdown("## ⚙️ Configuration")
 openai_key = st.sidebar.text_input("OpenAI API Key", value="", type="password")
 
@@ -202,62 +258,71 @@ docs_url = st.sidebar.text_input(
 
 lang = st.sidebar.selectbox("🌍 Language", ["English", "Hinglish", "Hindi"])
 voice = st.sidebar.selectbox("🎙️ Voice", ["coral", "alloy", "verse", "sage"])
-auto_voice = st.sidebar.toggle("🔊 Auto Voice Reply", value=True)
+auto_voice = st.sidebar.toggle("🔊 Auto Voice Reply", value=False)
 
-if st.sidebar.button("📥 Load Documentation"):
-    st.session_state.docs_text = load_docs(docs_url)
-    if st.session_state.docs_text:
-        st.sidebar.success("✅ Documentation loaded!")
-    else:
-        st.sidebar.error("❌ Docs not loaded. Check RAW URL.")
+c1, c2 = st.sidebar.columns(2)
+with c1:
+    if st.button("📥 Load Docs"):
+        st.session_state.docs_text = load_docs(docs_url)
+        if st.session_state.docs_text:
+            st.sidebar.success("✅ Docs loaded")
+        else:
+            st.sidebar.error("❌ Docs not loaded (RAW link wrong or file private)")
+with c2:
+    if st.button("🧹 Clear"):
+        st.session_state.messages = []
+        st.session_state.last_answer = ""
 
-st.sidebar.markdown("---")
-if st.sidebar.button("🧹 Clear Chat"):
-    st.session_state.messages = []
-    st.session_state.last_answer = ""
-
-# -----------------------------
+# =========================
 # HEADER
-# -----------------------------
-left, right = st.columns([1.7, 1.0])
-with left:
-    st.markdown(f"<div class='glow-title'>{BUSINESS['name']} Voice Agent</div>", unsafe_allow_html=True)
-    st.caption("UltraTech Only • Premium UI • Fast + Stable • Voice Replies")
+# =========================
+st.markdown("<div class='fadein card'>", unsafe_allow_html=True)
+st.markdown(f"<div class='title'>{BUSINESS['name']} Voice Agent</div>", unsafe_allow_html=True)
+st.markdown("<div class='sub'>UltraTech Only • Clean UI • Premium Animations • Voice Replies</div>", unsafe_allow_html=True)
 
-with right:
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.markdown(f"📞 **{BUSINESS['phones'][0]}** | **{BUSINESS['phones'][1]}**")
-    st.markdown(f"✉️ **{BUSINESS['email']}**")
-    st.markdown(f"📍 [Store Location]({BUSINESS['maps']})")
-    st.markdown(f"🌐 [Website]({BUSINESS['website']})")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# -----------------------------
-# QUICK ACTIONS
-# -----------------------------
-st.markdown("<div class='card'>", unsafe_allow_html=True)
-st.markdown("### ⚡ Quick Actions")
-
-c1, c2, c3, c4, c5 = st.columns(5)
-if c1.button("🧱 Cement Price"):
-    st.session_state.messages.append({"role": "user", "content": "Tell me UltraTech cement prices."})
-if c2.button("🛡️ Waterproofing"):
-    st.session_state.messages.append({"role": "user", "content": "Tell me Weather Pro waterproofing prices and uses."})
-if c3.button("🔩 Iron Ring"):
-    st.session_state.messages.append({"role": "user", "content": "Iron ring price and bulk order rules?"})
-if c4.button("📦 Book Order"):
-    st.session_state.messages.append({"role": "user", "content": "I want to book an order. What details do you need?"})
-if c5.button("💳 Payment"):
-    st.session_state.messages.append({"role": "user", "content": "How can I pay? Confirm payment options."})
+st.markdown(
+    f"""
+    <br>
+    <span class='badge'>📞 {BUSINESS['phones'][0]}</span>
+    <span class='badge'>📞 {BUSINESS['phones'][1]}</span>
+    <span class='badge'>✉️ {BUSINESS['email']}</span>
+    <span class='badge'>📍 Store Location</span>
+    """,
+    unsafe_allow_html=True
+)
+st.markdown(f"🔗 Store Location: {BUSINESS['maps']}")
+st.markdown(f"🌐 Website: {BUSINESS['website']}")
 st.markdown("</div>", unsafe_allow_html=True)
 
 st.write("")
 
-# -----------------------------
-# ORDER FORM
-# -----------------------------
-st.markdown("<div class='card'>", unsafe_allow_html=True)
-st.markdown("### 📦 Order Booking Form")
+# =========================
+# QUICK ACTIONS
+# =========================
+st.markdown("<div class='fadein card'>", unsafe_allow_html=True)
+st.markdown("### ⚡ Quick Actions (Tap)")
+qa1, qa2, qa3, qa4, qa5 = st.columns(5)
+
+if qa1.button("🧱 Cement Price"):
+    st.session_state.messages.append({"role": "user", "content": "Tell me UltraTech cement prices."})
+if qa2.button("🛡️ Waterproofing"):
+    st.session_state.messages.append({"role": "user", "content": "Tell me Weather Pro waterproofing prices and uses."})
+if qa3.button("🔩 Iron Ring"):
+    st.session_state.messages.append({"role": "user", "content": "Iron ring price and bulk order rules?"})
+if qa4.button("📦 Book Order"):
+    st.session_state.messages.append({"role": "user", "content": "I want to book an order. What details do you need?"})
+if qa5.button("💳 Payment"):
+    st.session_state.messages.append({"role": "user", "content": "How can I pay? Confirm payment options."})
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+st.write("")
+
+# =========================
+# ORDER FORM (CLEAN)
+# =========================
+st.markdown("<div class='fadein card'>", unsafe_allow_html=True)
+st.markdown("### 📦 Quick Order Form")
 
 a, b, c = st.columns(3)
 with a:
@@ -285,10 +350,9 @@ with q1:
 with q2:
     city = st.text_input("City / Area")
 
-address = st.text_area("Address (optional)")
 note = st.text_area("Extra Note (optional)")
 
-if st.button("✅ Save Order + WhatsApp Link"):
+if st.button("✅ Save Order + WhatsApp"):
     order_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     order = {
         "time": order_time,
@@ -297,7 +361,6 @@ if st.button("✅ Save Order + WhatsApp Link"):
         "product": product,
         "quantity": qty,
         "city": city,
-        "address": address,
         "note": note
     }
     st.session_state.orders.append(order)
@@ -310,7 +373,6 @@ Mobile: {mobile}
 Product: {product}
 Quantity: {qty}
 City/Area: {city}
-Address: {address}
 Note: {note}
 
 Please confirm final price, stock, delivery charges and payment details.
@@ -322,11 +384,13 @@ Please confirm final price, stock, delivery charges and payment details.
 
 st.markdown("</div>", unsafe_allow_html=True)
 
-# -----------------------------
+st.write("")
+
+# =========================
 # ORDERS DASHBOARD
-# -----------------------------
-st.markdown("<div class='card'>", unsafe_allow_html=True)
-st.markdown("### 📊 Orders Dashboard (Open)")
+# =========================
+st.markdown("<div class='fadein card'>", unsafe_allow_html=True)
+st.markdown("### 📊 Orders Dashboard")
 
 if len(st.session_state.orders) == 0:
     st.warning("No orders saved yet.")
@@ -339,26 +403,30 @@ else:
         file_name="shikhartraders_orders.csv",
         mime="text/csv"
     )
+
 st.markdown("</div>", unsafe_allow_html=True)
 
 st.write("")
 
-# -----------------------------
+# =========================
 # CHAT
-# -----------------------------
-st.markdown("<div class='card'>", unsafe_allow_html=True)
+# =========================
+st.markdown("<div class='fadein card'>", unsafe_allow_html=True)
 st.markdown("### 💬 Chat")
 
 if len(st.session_state.messages) == 0:
-    st.session_state.messages.append({"role": "assistant", "content": "Hi! I’m Shikhar Traders Voice Agent 👋 How can I help you today?"})
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": "Hi! I’m Shikhar Traders Voice Agent 👋 Ask me about UltraTech cement / waterproofing / orders."
+    })
 
 for m in st.session_state.messages:
     if m["role"] == "user":
-        st.markdown(f"<div class='chatbox'><span class='badge'>You</span><br>{m['content']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='bubble'><span class='badge'>You</span><br>{m['content']}</div>", unsafe_allow_html=True)
     else:
-        st.markdown(f"<div class='chatbox'><span class='badge'>Agent</span><br>{m['content']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='bubble'><span class='badge'>Agent</span><br>{m['content']}</div>", unsafe_allow_html=True)
 
-question = st.chat_input("Ask about UltraTech products / order booking / delivery / payment…")
+question = st.chat_input("Ask about UltraTech products / delivery / payment…")
 
 if question:
     st.session_state.messages.append({"role": "user", "content": question})
@@ -377,22 +445,30 @@ if question:
             st.session_state.last_answer = reply
             st.session_state.messages.append({"role": "assistant", "content": reply})
 
+            # Auto voice reply (with cooldown)
             if auto_voice:
-                try:
-                    audio = openai_tts(openai_key.strip(), reply[:900], voice=voice)
-                    st.audio(audio, format="audio/mp3")
-                except:
-                    pass
+                now = time.time()
+                if now - st.session_state.tts_last_time < 10:
+                    st.warning("⏳ Voice cooldown: wait 10 seconds to avoid 429 error.")
+                else:
+                    try:
+                        audio = openai_tts(openai_key.strip(), reply[:800], voice=voice)
+                        st.audio(audio, format="audio/mp3")
+                        st.session_state.tts_last_time = now
+                    except Exception as e:
+                        st.error("🔊 TTS failed (rate limit). Please wait 10 seconds and try again.")
 
         except Exception as e:
             st.session_state.messages.append({"role": "assistant", "content": f"⚠️ Error: {e}"})
 
 st.markdown("</div>", unsafe_allow_html=True)
 
-# -----------------------------
+st.write("")
+
+# =========================
 # SPEAK LAST ANSWER
-# -----------------------------
-st.markdown("<div class='card'>", unsafe_allow_html=True)
+# =========================
+st.markdown("<div class='fadein card'>", unsafe_allow_html=True)
 st.markdown("### 🔊 Speak Last Answer")
 
 if st.button("🎙️ Speak Again"):
@@ -401,9 +477,29 @@ if st.button("🎙️ Speak Again"):
     elif not st.session_state.last_answer.strip():
         st.info("No answer yet. Ask a question first.")
     else:
-        try:
-            audio = openai_tts(openai_key.strip(), st.session_state.last_answer[:900], voice=voice)
-            st.audio(audio, format="audio/mp3")
-        except Exception as e:
-            st.error(f"TTS error: {e}")
+        now = time.time()
+        if now - st.session_state.tts_last_time < 10:
+            st.warning("⏳ Wait 10 seconds to avoid 429 Too Many Requests.")
+        else:
+            try:
+                audio = openai_tts(openai_key.strip(), st.session_state.last_answer[:800], voice=voice)
+                st.audio(audio, format="audio/mp3")
+                st.session_state.tts_last_time = now
+            except:
+                st.error("TTS rate limit hit. Please wait and try again.")
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+# =========================
+# DOCS PREVIEW
+# =========================
+st.markdown("<div class='fadein card'>", unsafe_allow_html=True)
+st.markdown("### 📄 Documentation Preview")
+
+if st.session_state.docs_text.strip():
+    st.success("✅ Documentation is loaded.")
+    st.text_area("Docs (preview)", st.session_state.docs_text[:2500], height=220)
+else:
+    st.info("Docs not loaded. App will still work using built-in products + FAQs.")
+
 st.markdown("</div>", unsafe_allow_html=True)
